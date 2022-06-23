@@ -1,4 +1,4 @@
-name: gnn-test-env
+name: gnn-test-env-2
 channels:
   - pytorch
   - pyg

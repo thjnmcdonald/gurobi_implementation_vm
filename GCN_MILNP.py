@@ -123,10 +123,10 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, hard_coded = True):
 
     return m, A, feat_vec
 
-def make_convex_hull(m: gp.Model, hull_eqs, A_condensed, n, F):
-    for row in range(hull_eqs):
-        
-    m.addConstr(gp.quicksum(hull_eqs[] A[i,j] for i in range(n) for j in range(n) for f in range(F)))
+# def make_convex_hull(m: gp.Model, hull_eqs, A_condensed, n, F):
+#     for row in range(hull_eqs):
+
+#     m.addConstr(gp.quicksum(hull_eqs[] A[i,j] for i in range(n) for j in range(n) for f in range(F)))
     
 
 

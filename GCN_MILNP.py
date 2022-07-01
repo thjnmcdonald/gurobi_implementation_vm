@@ -44,7 +44,7 @@ def normalization_term(d_max):
 g = normalization_term(4)
 
 
-def make_norm_layers(m: gp.Model, d_max, F, n, A, x):
+def make_norm_layers(m: gp.Model, d_max, F, n, A, x, hard_coded = False):
     M_1 = 1
     M_2 = 1
     g = normalization_term(d_max)
@@ -86,6 +86,16 @@ def make_norm_layers(m: gp.Model, d_max, F, n, A, x):
     m.update()
 
     # add hardcoded conconstraints
+
+    atom_covalence = [4, 2, 1, 1] 
+
+    if hard_coded:
+        pass
+    else: 
+        # we take d_plus [i] minus A[i,i] becuase when dplus = 0 then A[ii] is also 0
+        # when dplus is at least 2 then we need to substract 1. With this we save making a new var. 
+        m.addConstrs((d_plus[i] - A[i,i] == gp.quicksum(atom_covalence[j] * x[i, j] for j in range(n)) for i in range(n)), 
+            name = 'atom_covalence')
 
     m.update()
     return m, t

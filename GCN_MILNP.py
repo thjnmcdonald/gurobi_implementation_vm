@@ -20,7 +20,7 @@ print(f'done loading directories')
 cwd = getcwd()
 print(f'{cwd=}')
 
-state_dict = torch.load("trained_models/multi_layer_24_may.tar")
+state_dict = torch.load("trained_models/multi_layer_1_july_simple.tar")
 
 hardcode, mol_dict = process('CCCCl', mol_dict = True)
 edge_index = hardcode.edge_index
@@ -91,13 +91,14 @@ def make_norm_layers(m: gp.Model, d_max, F, n, A, x):
     return m, t
 
 
-def make_input_constraints(m: gp.Model, rel_data, n, F, hard_coded = True):
+def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded = False):
     features = rel_data[2]
     edge_matrix = rel_data[1][0]
     feature_vectors = rel_data[-1]
 
     feat_vec = m.addVars(n, F, vtype=GRB.BINARY, name="feat_vec")
     A = m.addVars(n, n, vtype=GRB.BINARY, name="A")
+    x = m.addVars(n, F, vtype = GRB.BINARY, name = "x")
     m.update()
     
     # symmetry constraint 
@@ -121,19 +122,58 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, hard_coded = True):
 
         m.update()
 
-    return m, A, feat_vec
+    else:
+        num_atoms = feature_map.count('atom_type')
+        num_properties = feature_map.count('properties')
+        num_hybridization = feature_map.count('hybridization')
+        num_neighbours = feature_map.count('neighbours')
+        num_hydrogen = feature_map.count('hydrogen')
+        
+        features = [num_atoms, num_properties, num_hybridization, num_neighbours, num_hydrogen]        
+        feature_cumsum = np.cumsum(features)
 
-# def make_convex_hull(m: gp.Model, hull_eqs, A_condensed, n, F):
-#     for row in range(hull_eqs):
+        m.addConstr(1 == A[0,0], name = 'min constr')
 
-#     m.addConstr(gp.quicksum(hull_eqs[] A[i,j] for i in range(n) for j in range(n) for f in range(F)))
-    
+        m.addConstr(1 == A[1,1], name = 'min constr')
+        
+        m.addConstrs(((A[i,i] >= A[i + 1, i + 1])
+            for i in range(n-1)), name = '8a')
 
+        m.addConstrs((A[i,i] == gp.quicksum(x[i, s] for s in range(feature_cumsum[0])) for i in range(n)), 
+        name = 'one_atom')
 
+        m.addConstrs((A[i,i] == gp.quicksum(x[i, s] for s in range(feature_cumsum[1], feature_cumsum[2])) for i in range(n)), 
+        name = 'one_hybrid')
+
+        m.addConstrs((A[i,i] == gp.quicksum(x[i, s] for s in range(feature_cumsum[2], feature_cumsum[3])) for i in range(n)), 
+        name = 'one_nbor')
+
+        m.addConstrs((A[i,i] == gp.quicksum(x[i, s] for s in range(feature_cumsum[3], feature_cumsum[4])) for i in range(n)), 
+        name = 'one_hydro')
+
+        # change this later to automatically update atom types and their covalence. 
+        m.addConstrs(( (4*x[i,0] + 2*x[i,1] + 1*x[i,2] + 1*x[i,3] ==
+            gp.quicksum(x[i, s] for s in range(feature_cumsum[2], feature_cumsum[3]))
+            + gp.quicksum(x[i, s] for t in range(feature_cumsum[3], feature_cumsum[4]) ))
+              for i in range(n)), name = '8f')
+
+        M_4 = n + 1
+        list_indices = list(range(n))
+        sum_numbers = [[x for x in list_indices if x != i] for i in range(n)]
+        
+        m.addConstrs(((M_4*A[i,i] >= gp.quicksum(A[i,j] for j in sum_numbers[i]))
+             for i in range(n)), name = '8g')
+
+        m.addConstrs(((A[i,i] <= gp.quicksum(A[i,j] for j in sum_numbers[i]))
+             for i in range(n)), name = '8h')
+
+        m.addConstrs((A[i,j] == A[j,i] for i in range(n) for j in range(n)), name='symmetry_breaker')
+
+    return m, A, feat_vec    
 
 def make_GCN_milp(m: gp.Model, bt_procedures, x, n, F, d_max,
                   rel_data=rel_data, state_dict=state_dict,
-                  bilinear=False, norm_term=None, multi_layer=False):
+                  bilinear=False, norm_term=None, multi_layer=False, constrained_fingerprint = True):
 
     GCN_output_len = 32
 
@@ -160,6 +200,9 @@ def make_GCN_milp(m: gp.Model, bt_procedures, x, n, F, d_max,
         h[j].setAttr(gpy.GRB.Attr.LB, (lb))
         h[j].setAttr(gpy.GRB.Attr.UB, (ub))
         j += 1
+    
+    if constrained_fingerprint:
+        m.addConstr(gp.quicksum(h[i] for i in range(32)) <= 16)
 
     m.update()
 
@@ -198,7 +241,7 @@ def make_model_optimize_and_save(bt_procedures=[bt_lrr_gcn],
     ann_bt_procedures = [bt_lrr_ann]
     m.update()
 
-    m, A, x = make_input_constraints(m, rel_data, n, F)
+    m, A, x = make_input_constraints(m, rel_data, n, F, mol_dict)
     m.update()
 
     m, t_vars = make_norm_layers(m, d_max, F, n, A, x)
@@ -222,8 +265,8 @@ def make_model_optimize_and_save(bt_procedures=[bt_lrr_gcn],
     file_name = 'here_we_go_again'
     m.write(file_name + '.lp')
 
-    # if bilinear == True:
-    #     m.Params.NonConvex = 2
+    if bilinear == True:
+        m.Params.NonConvex = 2
 
     m.optimize()
 
@@ -357,6 +400,8 @@ def compare_h_prime_val():
 
 def main():
     make_model_optimize_and_save(bilinear=True)
+    print(f'{mol_dict=}')
+    print(f'{len(mol_dict)=}')
 
 
 if __name__ == "__main__":

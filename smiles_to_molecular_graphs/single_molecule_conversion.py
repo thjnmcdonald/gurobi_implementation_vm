@@ -86,10 +86,11 @@ def process(smiles, mol_dict = False):
         num_neighbors.append(len(atom.GetNeighbors()))
 
     x1 = F.one_hot(torch.tensor(type_idx), num_classes=len(types))
-    x2 = torch.tensor([aromatic, ring, sp, sp2, sp3, sp3d, sp3d2], dtype=torch.float).t().contiguous()
+    x2_a = torch.tensor([aromatic, ring], dtype=torch.float).t().contiguous()
+    x2_b = torch.tensor([sp, sp2, sp3, sp3d, sp3d2], dtype=torch.float).t().contiguous()
     x3 = F.one_hot(torch.tensor(num_neighbors), num_classes=5)
     x4 = F.one_hot(torch.tensor(num_hs), num_classes=5)
-    x = torch.cat([x1.to(torch.float), x2, x3.to(torch.float),x4.to(torch.float)], dim=-1)
+    x = torch.cat([x1.to(torch.float), x2_a, x2_b, x3.to(torch.float),x4.to(torch.float)], dim=-1)
 
     # bond features
     row, col, bond_idx, conj, ring, stereo = [], [], [], [], [], []
@@ -131,11 +132,12 @@ def process(smiles, mol_dict = False):
     data = Data(x=x, edge_index=edge_index,
                 edge_attr=edge_attr, mol_id=ascii_name)
 
-    atom_dict = ['atom_type'] * [*x1.shape][0]
-    properties_dict = ['properties'] * [*x2.shape][0]
-    neighbours_dict = ['neighbours'] * [*x3.shape][0]
-    hydrogen_dict = ['hydrogen'] * [*x3.shape][0]
-    mol_dict = [*atom_dict, *properties_dict, *neighbours_dict, *hydrogen_dict]
+    atom_dict = ['atom_type'] * [*x1.shape][1]
+    properties_dict = ['properties'] * [*x2_a.shape][1]
+    hybridization_dict = ['hybridization'] * [*x2_b.shape][1]
+    neighbours_dict = ['neighbours'] * [*x3.shape][1]
+    hydrogen_dict = ['hydrogen'] * [*x4.shape][1]
+    mol_dict = [*atom_dict, *properties_dict, *hybridization_dict, *neighbours_dict, *hydrogen_dict]
     print(f'{mol_dict=}')
 
     return (data, mol_dict) if mol_dict else data 

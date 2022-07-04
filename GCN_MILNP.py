@@ -181,7 +181,7 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
         
         # we need to have connected graph
         # since A[0,0] and A[1,1] are one, we only need this for i >= 1
-        m.addConstrs((A[i,i] <= gp.quicksum(A[j,i] for j in range(i)) for i in range(1, n)), name = 'conected_graph')
+        m.addConstrs((A[i,i] <= gp.quicksum(A[j,i] for j in range(i)) for i in range(2, n)), name = 'conected_graph')
 
     return m, A, x
 

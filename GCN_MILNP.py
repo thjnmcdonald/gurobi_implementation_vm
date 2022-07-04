@@ -106,7 +106,7 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
     edge_matrix = rel_data[1][0]
     feature_vectors = rel_data[-1]
 
-    feat_vec = m.addVars(n, F, vtype=GRB.BINARY, name="feat_vec")
+    
     A = m.addVars(n, n, vtype=GRB.BINARY, name="A")
     x = m.addVars(n, F, vtype = GRB.BINARY, name = "x")
     m.update()
@@ -128,7 +128,7 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
 
         for i in range(n):
             for j in range(F):
-                m.addConstr(feat_vec[i, j] == feature_vectors[i, j])
+                m.addConstr(x[i, j] == feature_vectors[i, j])
 
         m.update()
 
@@ -179,7 +179,7 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
 
         m.addConstrs((A[i,j] == A[j,i] for i in range(n) for j in range(n)), name='symmetry_breaker')
 
-    return m, A, feat_vec    
+    return m, A, x
 
 def make_GCN_milp(m: gp.Model, bt_procedures, x, n, F, d_max,
                   rel_data=rel_data, state_dict=state_dict,

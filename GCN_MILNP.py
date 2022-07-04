@@ -145,6 +145,8 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
         m.addConstr(1 == A[0,0], name = 'min constr')
 
         m.addConstr(1 == A[1,1], name = 'min constr')
+
+        m.addConstr(1 == A[0,1], name = 'min constr')
         
         m.addConstrs(((A[i,i] >= A[i + 1, i + 1])
             for i in range(n-1)), name = '8a')

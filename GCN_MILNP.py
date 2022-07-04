@@ -179,6 +179,11 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
 
         m.addConstrs((A[i,j] == A[j,i] for i in range(n) for j in range(n)), name='symmetry_breaker')
 
+        
+        # we need to have connected graph
+        # since A[0,0] and A[1,1] are one, we only need this for i >= 1
+        m.addConstrs((A[i,i] <= gp.quicksum(A[j,i] for j in range(i)) for i in range(2, n)), name = 'conected_graph')
+
     return m, A, x
 
 def make_GCN_milp(m: gp.Model, bt_procedures, x, n, F, d_max,

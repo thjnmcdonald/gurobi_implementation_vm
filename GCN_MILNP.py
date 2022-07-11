@@ -16,6 +16,8 @@ from optimization.nn_milp_builder_tom_version import *
 from optimization.bound_tightening.bt_lp import bt_lrr as bt_lrr_ann
 from GCN.optimization.bound_tightening.bt_lp import bt_lrr as bt_lrr_gcn
 
+find_mol_of_length = 5
+
 print(f'done loading directories')
 cwd = getcwd()
 print(f'{cwd=}')
@@ -267,7 +269,7 @@ def make_ANN_milp(m: gp.Model, bt_procedures, n, h, rel_data=rel_data, state_dic
 
 def make_model_optimize_and_save(bt_procedures=[bt_lrr_gcn],
                                  ann_bt_procedures=[bt_lrr_ann],
-                                 n=4, F=21, d_max=4,
+                                 n=find_mol_of_length, F=21, d_max=4,
                                  rel_data=rel_data, state_dict=state_dict, bilinear=False):
     m = gp.Model("GNN")
     bt_procedures = [bt_lrr_gcn]
@@ -311,13 +313,13 @@ def make_model_optimize_and_save(bt_procedures=[bt_lrr_gcn],
     return val
 
 
-n = 4
+n = find_mol_of_length
 F = 21
 
 
 def test_make_model_optimize_and_save(t, bt_procedures=[bt_lrr_gcn],
                                       ann_bt_procedures=[bt_lrr_ann],
-                                      n=4, F=21, d_max=4,
+                                      n=find_mol_of_length, F=21, d_max=4,
                                       rel_data=rel_data, state_dict=state_dict, bilinear=True):
 
     env = gp.Env(empty=True)

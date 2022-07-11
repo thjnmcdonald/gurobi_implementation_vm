@@ -94,8 +94,10 @@ def make_norm_layers(m: gp.Model, d_max, F, n, A, x, hard_coded = False):
     else: 
         # we take d_plus [i] minus A[i,i] becuase when dplus = 0 then A[ii] is also 0
         # when dplus is at least 2 then we need to substract 1. With this we save making a new var. 
-        m.addConstrs((d_plus[i] - A[i,i] == gp.quicksum(atom_covalence[j] * x[i, j] for j in range(n)) for i in range(n)), 
-            name = 'atom_covalence')
+        pass
+        m.addConstrs((d_plus[i] - A[i,i] == gp.quicksum((j - 11) * x[i, j] for j in range(11,16)) for i in range(n)), 
+            name = 'neighbour_connection')
+
 
     m.update()
     return m, t
@@ -105,6 +107,7 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
     features = rel_data[2]
     edge_matrix = rel_data[1][0]
     feature_vectors = rel_data[-1]
+    print(f'{features=} \n {edge_matrix=} \n {feature_vectors=}')
 
     
     A = m.addVars(n, n, vtype=GRB.BINARY, name="A")
@@ -141,12 +144,13 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
         
         features = [num_atoms, num_properties, num_hybridization, num_neighbours, num_hydrogen]        
         feature_cumsum = np.cumsum(features)
+        print(f'{feature_cumsum=}')
 
         m.addConstr(1 == A[0,0], name = 'min constr')
 
         m.addConstr(1 == A[1,1], name = 'min constr')
 
-        m.addConstr(1 == A[0,1], name = 'min constr')
+        m.addConstr(1 == A[1,0], name = 'min constr')
         
         m.addConstrs(((A[i,i] >= A[i + 1, i + 1])
             for i in range(n-1)), name = '8a')
@@ -165,26 +169,38 @@ def make_input_constraints(m: gp.Model, rel_data, n, F, feature_map, hard_coded 
 
         # change this later to automatically update atom types and their covalence. 
         m.addConstrs(( (4*x[i,0] + 2*x[i,1] + 1*x[i,2] + 1*x[i,3] ==
-            gp.quicksum(x[i, s] for s in range(feature_cumsum[2], feature_cumsum[3]))
-            + gp.quicksum(x[i, s] for t in range(feature_cumsum[3], feature_cumsum[4]) ))
+            gp.quicksum( (s-11)*x[i, s] for s in range(feature_cumsum[2], feature_cumsum[3]))
+            + gp.quicksum((t - 16) * x[i, t] for t in range(feature_cumsum[3], feature_cumsum[4]) ))
               for i in range(n)), name = '8f')
 
         M_4 = n + 1
+        
+        # big-M value, equal to amount of different feature types in feature vectors
+        M_5 = len(set(feature_map))
+
         list_indices = list(range(n))
         sum_numbers = [[x for x in list_indices if x != i] for i in range(n)]
         
         m.addConstrs(((M_4*A[i,i] >= gp.quicksum(A[i,j] for j in sum_numbers[i]))
              for i in range(n)), name = '8g')
 
+        # forces neighbour feature to be equal to the actual outdegree of A
+        m.addConstrs(
+            ( gp.quicksum(A[i,s] for s in sum_numbers[i]) == gp.quicksum((t-11)*x[i,t] for t in range(feature_cumsum[2], feature_cumsum[3])) 
+                for i in range(n)), name = 'out_degree_feature'
+        )
+
         m.addConstrs(((A[i,i] <= gp.quicksum(A[i,j] for j in sum_numbers[i]))
              for i in range(n)), name = '8h')
 
         m.addConstrs((A[i,j] == A[j,i] for i in range(n) for j in range(n)), name='symmetry_breaker')
         
+        m.addConstrs((A[i,i]*M_5 >= gp.quicksum(x[i,s] for s in range(len(feature_map))) for i in range(n)), name = 'close_feature')
+
         # we need to have connected graph
         # since A[0,0] and A[1,1] are one, we only need this for i >= 1
         sum_numbers_2 = [[x for x in list_indices if x < i] for i in range(n)]
-        m.addConstrs((A[i,i] <= gp.quicksum(A[j,i] for j in sum_numbers_2[i]) for i in range(2, n)), name = 'conected_graph')
+        m.addConstrs((A[i,i] <= gp.quicksum(A[i,j] for j in sum_numbers_2[i]) for i in range(2, n)), name = 'connected_graph')
 
     return m, A, x
 
@@ -219,7 +235,7 @@ def make_GCN_milp(m: gp.Model, bt_procedures, x, n, F, d_max,
         j += 1
     
     if constrained_fingerprint:
-        m.addConstr(gp.quicksum(h[i] for i in range(32)) <= 16)
+        m.addConstr(gp.quicksum(h[i] for i in range(32)) <= 20)
 
     m.update()
 
